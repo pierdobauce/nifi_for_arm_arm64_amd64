@@ -1,0 +1,2 @@
+[registry."sarmand.ddns.net:5000"]
+  http = true

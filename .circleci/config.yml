@@ -1,0 +1,98 @@
+version: 2.1
+jobs:
+  build:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - checkout
+     
+      # Mise en place de buildx pour creer des images arm64 et amd64
+      - run:
+          name: Remove old installation
+          command: |
+            sudo service docker stop
+            sudo apt remove docker-ce containerd.io docker docker-engine docker.io containerd runc
+      - run:
+          name: re install last version of docker
+          command: |
+            lsb_release -a
+            echo "1"
+            sudo apt-get update -y
+            echo "2"
+            sudo apt-get -y install apt-transport-https ca-certificates curl gnupg-agent software-properties-common
+            echo "3"
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+            echo "4"
+            sudo apt-key fingerprint 0EBFCD88
+            echo "5"
+            sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+            echo "6"
+            sudo apt-get install docker-ce docker-ce-cli containerd.io
+            echo "7"
+            sudo docker run hello-world
+            echo "8"
+            docker version
+      - run:
+          name: Install buildx
+          command: |
+            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.3.1/buildx-v0.3.1.linux-amd64"
+            echo "1"
+            curl --output docker-buildx --silent --show-error --location --fail --retry 3 "$BUILDX_BINARY_URL"
+            echo "2"
+            mkdir -p ~/.docker/cli-plugins
+            echo "3"
+            export DOCKER_CLI_EXPERIMENTAL=enabled
+            echo "4"
+            docker version
+            echo "5"
+            mv docker-buildx ~/.docker/cli-plugins/
+            echo "6"
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            echo "7"
+            docker buildx install
+            echo "8"
+            # Run binfmt
+            #docker run --rm --privileged docker/binfmt:66f9012c56a8316f9244ffd7622d7c21c1f6f28d
+            docker run --rm --privileged docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
+            #export DOCKER_BUILDKIT=1
+            #docker build --platform=local -o . git://github.com/docker/buildx
+            #mv buildx ~/.docker/cli-plugins/docker-buildx
+            echo "9"
+            docker buildx ls
+            echo "10"
+            sudo ls -al /proc/sys/fs/binfmt_misc
+            sudo cat /proc/sys/fs/binfmt_misc/qemu-aarch64
+            echo "11"
+            sudo cat /proc/sys/fs/binfmt_misc/qemu-arm
+            
+      - run:
+         name: Configuring docker daemon to use insecure registries
+         command: |
+           json=`mktemp`
+           echo '{ "insecure-registries": [ "sarmand.ddns.net:5000" ] }' > ${json}
+           sudo mv ${json} /etc/docker/daemon.json
+           sudo service docker restart
+           echo "Configured Docker daemon with insecure-registry"
+           
+      - run:
+          name: Use buildx
+          command: |
+             docker buildx create --name mybuilder --config buildxconfigfile
+             docker buildx use mybuilder
+             docker buildx inspect --bootstrap             
+          
+      - run:
+         name: Connecting to my own insecure registry
+         command: |
+           #docker image list
+           docker login -u pierdo -p pierd0 sarmand.ddns.net:5000
+           #docker image tag extract pierdobauce.ddns.net:5000/extract
+           #docker push pierdobauce.ddns.net:5000/extract
+ 
+      - run:
+         name: create nifi images and push them
+         command: |
+            docker buildx build --platform linux/amd64,linux/arm64,linux/arm -f Dockerfile --push -t sarmand.ddns.net:5000/nifi:latest .
+
+
+            
