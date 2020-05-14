@@ -92,7 +92,7 @@ jobs:
       - run:
          name: create nifi images and push them
          command: |
-            docker buildx build --platform linux/amd64,linux/arm64,linux/arm -f Dockerfile --push -t sarmand.ddns.net:5000/nifi:latest .
+            docker buildx build --platform linux/arm64 -f Dockerfile --push -t sarmand.ddns.net:5000/nifi:latest .
 
 
             
